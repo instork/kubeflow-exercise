@@ -1,0 +1,72 @@
+name: Divide and return number
+inputs:
+- {name: number, type: Integer}
+outputs:
+- {name: quotient, type: Integer}
+- {name: remainder, type: Integer}
+implementation:
+  container:
+    image: python:3.8.13
+    command:
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      def divide_and_return_number(
+          number,
+      ):
+          from collections import namedtuple
+
+          quotient, remainder = divmod(number, 2)
+          print("quotient is", quotient)
+          print("remainder is", remainder)
+
+          divide_outputs = namedtuple(
+              "DivideOutputs",
+              [
+                  "quotient",
+                  "remainder",
+              ],
+          )
+          return divide_outputs(quotient, remainder)
+
+      def _serialize_int(int_value: int) -> str:
+          if isinstance(int_value, str):
+              return int_value
+          if not isinstance(int_value, int):
+              raise TypeError('Value "{}" has type "{}" instead of int.'.format(
+                  str(int_value), str(type(int_value))))
+          return str(int_value)
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Divide and return number', description='')
+      _parser.add_argument("--number", dest="number", type=int, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+      _parsed_args = vars(_parser.parse_args())
+      _output_files = _parsed_args.pop("_output_paths", [])
+
+      _outputs = divide_and_return_number(**_parsed_args)
+
+      _output_serializers = [
+          _serialize_int,
+          _serialize_int,
+
+      ]
+
+      import os
+      for idx, output_file in enumerate(_output_files):
+          try:
+              os.makedirs(os.path.dirname(output_file))
+          except OSError:
+              pass
+          with open(output_file, 'w') as f:
+              f.write(_output_serializers[idx](_outputs[idx]))
+    args:
+    - --number
+    - {inputValue: number}
+    - '----output-paths'
+    - {outputPath: quotient}
+    - {outputPath: remainder}
